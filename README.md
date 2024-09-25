@@ -30,7 +30,15 @@
 | -confluence | Generate Confluence pages by calling its API. `Not support yet.` |
 | -input [spreadsheet] | The spreadsheet file. `More than one spreadsheet can be handled.`|
 | -output [path_of_folder] | The folder of generated files. |
-## Examples
+## Example command lines
+
+    TBA
+
+# RTL code structure
+
+    TBA
+
+# RAL code clips
 
     TBA
 
@@ -41,3 +49,7 @@
 # Top level register map spreadsheet
 
     TBA
+
+# Contact
+
+xeroncn+validfox.dooku@gmail.com

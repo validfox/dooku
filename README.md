@@ -32,7 +32,8 @@
 | -d [path_of_folder] | The folder of generated files. |
 ## Example command lines
 
-    > python3 dooku.py -i blockA.xlsx -i blockB.xlsx -ral -d ./output/ # Note: the output folder should be created manually.
+     # Note: the output folder should be created manually.
+    > python3 dooku.py -i blockA.xlsx -i blockB.xlsx -ral -d ./output/
     > python3 dooku.py -i blockA.xlsx -rtl -d ./output/
     > python3 dooku.py -i top.xlsx -ral -cheader -d ./output/
     > python3 dooku.py -i top.xlsx -html -d ./html/

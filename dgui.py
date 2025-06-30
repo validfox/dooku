@@ -5,63 +5,63 @@ import platform
 
 # 原始 dict
 base_dict = {
-    'Description': '',
     'Fields': {
-        12: {
+        0: {
             'Access': 'RW',
             'BitWidth': '32',
             'DefaultValue': '0',
-            'Description': '',
             'EnableBy': '',
-            'FieldName': 'USR',
+            'FieldName': 'FIELD0',
             'HardwareUpdate': '',
-            'LineNumber': 12,
             'LinkTo': '',
             'NotGenCode': '',
             'SelfClear': '',
             'SoftwareReset': 'TRUE',
             'StartBit': '0',
             'Volatile': '',
-            'descrFieldName': ''
+            'descrFieldName': '',
+            'Description': 'New Field'
         }
     },
+    #'IncrAddress': '',
+    'OffsetAddress': '0x0',
+    'RegisterName': 'REG0',
+    'descrRegName': '',
     'Flag': '0',
-    'IncrAddress': '',
-    'LineNumber': 11,
-    'OffsetAddress': '0x4',
-    'RegisterName': 'RWREG',
-    'descrRegName': ''
+    'Description': 'New Register'
 }
 
 # 存放所有 dict 的列表
 dict_list = [copy.deepcopy(base_dict)]
 
-
 def show_dicts():
-    """在主界面显示所有 dict 的详细信息，并添加各个操作按钮"""
+    """在主界面显示所有 dict 的简化信息，并添加各个操作按钮"""
     for widget in dict_frame.winfo_children():
         widget.destroy()
 
-    # 对于每个 dict
     for idx, d in enumerate(dict_list):
         main_frame = ttk.Frame(dict_frame, padding=5, relief="ridge")
         main_frame.pack(fill="x", padx=5, pady=3)
 
-        # 显示整个 dict 的文本信息
-        text = tk.Text(main_frame, height=10, width=80, wrap="word")
-        text.insert(tk.END, f"Dict {idx + 1}:\n{d}")
-        text.config(state="disabled")
-        text.pack(side="top", padx=5, pady=5)
+        # 上半部分：非 Fields 信息 + 操作按钮（在同一行）
+        top_row_frame = ttk.Frame(main_frame)
+        top_row_frame.pack(side="top", fill="x", padx=5, pady=5)
 
-        # 按钮框架（用于修改、删除整个 dict 及添加 Field）
-        btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack(side="top", fill="x", padx=5, pady=2)
+        # 拼接非 Fields 的 value 信息（在一行中）
+        info_values = [str(v) for k, v in d.items() if k not in ["Fields", "LineNumber"]]
+        info_text = "Register: " + ", ".join(info_values)
+        info_label = ttk.Label(top_row_frame, text=info_text, wraplength=1500, justify="left")
+        info_label.pack(side="left", padx=5, anchor="w", expand=True)
 
-        ttk.Button(btn_frame, text="修改 dict", command=lambda i=idx: edit_dict(i)).pack(side="left", padx=2)
-        ttk.Button(btn_frame, text="删除 dict", command=lambda i=idx: delete_dict(i)).pack(side="left", padx=2)
-        ttk.Button(btn_frame, text="添加 Field", command=lambda i=idx: add_field(i)).pack(side="left", padx=2)
+        # 按钮们放在右侧
+        btn_frame = ttk.Frame(top_row_frame)
+        btn_frame.pack(side="right", padx=5)
 
-        # 显示 Fields 内部各 Field 的信息及对应操作按钮
+        ttk.Button(btn_frame, text="Edit", command=lambda i=idx: edit_dict(i)).pack(side="left", padx=2)
+        ttk.Button(btn_frame, text="Delete", command=lambda i=idx: delete_dict(i)).pack(side="left", padx=2)
+        ttk.Button(btn_frame, text="Add Field", command=lambda i=idx: add_field(i)).pack(side="left", padx=2)
+
+        # Fields 区域
         fields_frame = ttk.Frame(main_frame, relief="groove", padding=5)
         fields_frame.pack(side="top", fill="x", padx=5, pady=5)
         ttk.Label(fields_frame, text="Fields:", font=('Arial', 10, 'bold')).pack(anchor="w")
@@ -70,17 +70,18 @@ def show_dicts():
             field_frame = ttk.Frame(fields_frame, padding=3, relief="ridge")
             field_frame.pack(fill="x", padx=5, pady=3)
 
-            # 显示 Field 信息
-            field_info = f"Key: {f_key}  Value: {f_value}"
-            ttk.Label(field_frame, text=field_info, wraplength=500).pack(side="left", padx=5)
+            # 只显示子 dict 的 value（不显示 key）
+            val_list = [str(v) for v in f_value.values() if f_key not in ["LineNumber"]]
+            field_info = ", ".join(val_list)
+            ttk.Label(field_frame, text=field_info, wraplength=600, justify="left").pack(side="left", padx=5)
 
-            # 编辑和删除 Field 按钮
+            # 编辑和删除按钮（并排显示）
             btn_field_frame = ttk.Frame(field_frame)
             btn_field_frame.pack(side="right", padx=5)
-            ttk.Button(btn_field_frame, text="编辑 Field", 
-                       command=lambda di=idx, fk=f_key: edit_field(di, fk)).pack(side="top", padx=2, pady=1)
-            ttk.Button(btn_field_frame, text="删除 Field", 
-                       command=lambda di=idx, fk=f_key: delete_field(di, fk)).pack(side="top", padx=2, pady=1)
+            ttk.Button(btn_field_frame, text="Edit",
+                       command=lambda di=idx, fk=f_key: edit_field(di, fk)).pack(side="left", padx=2)
+            ttk.Button(btn_field_frame, text="Delete",
+                       command=lambda di=idx, fk=f_key: delete_field(di, fk)).pack(side="left", padx=2)
 
     root.update_idletasks()
     canvas.configure(scrollregion=canvas.bbox("all"))
@@ -119,7 +120,7 @@ def update_existing_dict(index, updated_dict):
 def add_field(index):
     """为指定 dict 的 Fields 添加新的 Field"""
     edit_window = tk.Toplevel(root)
-    edit_window.title("添加新 Field")
+    edit_window.title("New Field")
 
     form_frame = ttk.Frame(edit_window, padding=10)
     form_frame.pack(fill=tk.BOTH, expand=True)
@@ -150,7 +151,8 @@ def add_field(index):
     entry_fields = []
     row = 0
     for key, value in new_field.items():
-        label = ttk.Label(form_frame, text=f"{key}（默认：{value}）:")
+        #label = ttk.Label(form_frame, text=f"{key}(Default: {value}):")
+        label = ttk.Label(form_frame, text=f"{key}:")
         label.grid(row=row, column=0, sticky="w", padx=5, pady=2)
         entry = ttk.Entry(form_frame, width=40)
         entry.insert(0, str(value))
@@ -167,14 +169,14 @@ def add_field(index):
         edit_window.destroy()
         show_dicts()
 
-    submit_btn = ttk.Button(form_frame, text="提交", command=submit_field)
+    submit_btn = ttk.Button(form_frame, text="Done", command=submit_field)
     submit_btn.grid(row=row, column=0, columnspan=2, pady=10)
 
 
 def edit_field(dict_index, field_key):
     """编辑指定 dict 内的某个 Field"""
     edit_window = tk.Toplevel(root)
-    edit_window.title("编辑 Field")
+    edit_window.title("Edit Field")
 
     form_frame = ttk.Frame(edit_window, padding=10)
     form_frame.pack(fill=tk.BOTH, expand=True)
@@ -184,7 +186,8 @@ def edit_field(dict_index, field_key):
     entry_fields = []
     row = 0
     for key, value in field_data.items():
-        label = ttk.Label(form_frame, text=f"{key}（当前：{value}）:")
+        #label = ttk.Label(form_frame, text=f"{key}(Current:{value}):")
+        label = ttk.Label(form_frame, text=f"{key}:")
         label.grid(row=row, column=0, sticky="w", padx=5, pady=2)
         entry = ttk.Entry(form_frame, width=40)
         entry.insert(0, str(value))
@@ -198,7 +201,7 @@ def edit_field(dict_index, field_key):
         edit_window.destroy()
         show_dicts()
 
-    submit_btn = ttk.Button(form_frame, text="提交", command=submit_edit)
+    submit_btn = ttk.Button(form_frame, text="Done", command=submit_edit)
     submit_btn.grid(row=row, column=0, columnspan=2, pady=10)
 
 
@@ -212,7 +215,7 @@ def delete_field(dict_index, field_key):
 def open_edit_window(target_dict, on_submit):
     """通用的 dict 编辑窗口（用于新增和修改整个 dict）"""
     edit_window = tk.Toplevel(root)
-    edit_window.title("编辑字典")
+    edit_window.title("Edit Register")
 
     form_frame = ttk.Frame(edit_window, padding=10)
     form_frame.pack(fill=tk.BOTH, expand=True)
@@ -226,7 +229,8 @@ def open_edit_window(target_dict, on_submit):
             if isinstance(value, dict):
                 add_entries(value, keys + [key])
             else:
-                label = ttk.Label(form_frame, text=" -> ".join(map(str, keys + [key])) + f"（原值：{value}）:")
+                #label = ttk.Label(form_frame, text=" -> ".join(map(str, keys + [key])) + f"(Old Value:{value}):")
+                label = ttk.Label(form_frame, text=" -> ".join(map(str, keys + [key])))
                 label.grid(row=row, column=0, sticky="w", padx=5, pady=2)
                 entry = ttk.Entry(form_frame, width=40)
                 entry.insert(0, str(value))
@@ -246,13 +250,13 @@ def open_edit_window(target_dict, on_submit):
         on_submit(updated_dict)
         edit_window.destroy()
 
-    submit_btn = ttk.Button(form_frame, text="提交", command=submit_form)
+    submit_btn = ttk.Button(form_frame, text="Done", command=submit_form)
     submit_btn.grid(row=row, column=0, columnspan=2, pady=10)
 
 
 # 主窗口
 root = tk.Tk()
-root.title("Dict 显示、编辑与管理示例")
+root.title("Register Editor")
 
 # 创建外层 Frame 包裹 canvas + scrollbar
 outer_frame = ttk.Frame(root)
@@ -313,9 +317,8 @@ else:  # Linux 处理方式
     canvas.bind_all("<Shift-Button-4>", lambda e: canvas.xview_scroll(-1, "units"))
     canvas.bind_all("<Shift-Button-5>", lambda e: canvas.xview_scroll(1, "units"))
 
-ttk.Button(root, text="添加新字典", command=add_new_dict).pack(pady=5)
+ttk.Button(root, text="Add Register", command=add_new_dict).pack(pady=5)
 
 show_dicts()
 
 root.mainloop()
-

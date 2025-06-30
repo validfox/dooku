@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 import copy
+import platform
 
 # 原始 dict
 base_dict = {
@@ -82,7 +83,7 @@ def show_dicts():
                        command=lambda di=idx, fk=f_key: delete_field(di, fk)).pack(side="top", padx=2, pady=1)
 
     root.update_idletasks()
-
+    canvas.configure(scrollregion=canvas.bbox("all"))
 
 def delete_dict(index):
     """删除指定的 dict"""
@@ -253,8 +254,64 @@ def open_edit_window(target_dict, on_submit):
 root = tk.Tk()
 root.title("Dict 显示、编辑与管理示例")
 
-dict_frame = ttk.Frame(root, padding=10)
-dict_frame.pack(fill=tk.BOTH, expand=True)
+# 创建外层 Frame 包裹 canvas + scrollbar
+outer_frame = ttk.Frame(root)
+outer_frame.pack(fill=tk.BOTH, expand=True)
+
+# 创建 Canvas
+canvas = tk.Canvas(outer_frame)
+canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+# 创建垂直 & 水平 Scrollbar
+v_scroll = ttk.Scrollbar(outer_frame, orient=tk.VERTICAL, command=canvas.yview)
+v_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+
+h_scroll = ttk.Scrollbar(root, orient=tk.HORIZONTAL, command=canvas.xview)
+h_scroll.pack(side=tk.BOTTOM, fill=tk.X)
+
+# 配置 Scrollbar 控制 Canvas
+canvas.configure(yscrollcommand=v_scroll.set, xscrollcommand=h_scroll.set)
+
+# 创建 Frame 用于容纳内容，并挂到 Canvas 上
+dict_frame = ttk.Frame(canvas)
+dict_frame_id = canvas.create_window((0, 0), window=dict_frame, anchor="nw")
+
+# 在内容变化或尺寸变化时，调整 scrollregion 和 frame 尺寸
+def configure_canvas(event):
+    canvas.configure(scrollregion=canvas.bbox("all"))
+    # 自动适配宽度（当窗口被最大化时）
+    canvas.itemconfig(dict_frame_id, width=canvas.winfo_width())
+
+canvas.bind("<Configure>", lambda e: canvas.itemconfig(dict_frame_id, width=canvas.winfo_width()))
+
+dict_frame.bind("<Configure>", configure_canvas)
+
+# 鼠标滚轮支持（不同平台略有不同）
+def _on_mousewheel(event):
+    if platform.system() == 'Windows':
+        canvas.yview_scroll(-1 * int(event.delta / 120), "units")
+    elif platform.system() == 'Darwin':  # macOS
+        canvas.yview_scroll(-1 * int(event.delta), "units")
+    else:  # Linux, use Button-4 and Button-5
+        pass  # handled separately below
+
+def _on_shift_mousewheel(event):
+    if platform.system() == 'Windows':
+        canvas.xview_scroll(-1 * int(event.delta / 120), "units")
+    elif platform.system() == 'Darwin':
+        canvas.xview_scroll(-1 * int(event.delta), "units")
+    else:
+        pass  # handled separately below
+
+# Windows 和 macOS 支持滚动
+if platform.system() in ['Windows', 'Darwin']:
+    canvas.bind_all("<MouseWheel>", _on_mousewheel)
+    canvas.bind_all("<Shift-MouseWheel>", _on_shift_mousewheel)
+else:  # Linux 处理方式
+    canvas.bind_all("<Button-4>", lambda e: canvas.yview_scroll(-1, "units"))
+    canvas.bind_all("<Button-5>", lambda e: canvas.yview_scroll(1, "units"))
+    canvas.bind_all("<Shift-Button-4>", lambda e: canvas.xview_scroll(-1, "units"))
+    canvas.bind_all("<Shift-Button-5>", lambda e: canvas.xview_scroll(1, "units"))
 
 ttk.Button(root, text="添加新字典", command=add_new_dict).pack(pady=5)
 

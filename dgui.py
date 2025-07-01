@@ -1,5 +1,6 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog
+import json
 import copy
 import platform
 
@@ -34,7 +35,15 @@ base_dict = {
 # 存放所有 dict 的列表
 dict_list = [copy.deepcopy(base_dict)]
 
+dict_frames = []  # 存放每个dict对应的Frame对象
+highlighted_index = None  # 当前高亮的dict索引
+
 def show_dicts():
+    dict_frames.clear() # 清空旧的 frame 列表
+
+    # Step 1: 记录当前垂直滚动位置
+    y_position = canvas.yview()
+
     """在主界面显示所有 dict 的简化信息，并添加各个操作按钮"""
     for widget in dict_frame.winfo_children():
         widget.destroy()
@@ -42,6 +51,15 @@ def show_dicts():
     for idx, d in enumerate(dict_list):
         main_frame = ttk.Frame(dict_frame, padding=5, relief="ridge")
         main_frame.pack(fill="x", padx=5, pady=3)
+
+        dict_frames.append(main_frame)  # 保存 frame 引用
+
+        # 如果当前是被高亮项，则设置背景色
+        bg_color = "#fffacd" if idx == highlighted_index else None
+        if bg_color:
+            main_frame.configure(style=f"Highlight.TFrame")
+        else:
+            main_frame.configure(style="TFrame")  # 恢复默认样式
 
         # 上半部分：非 Fields 信息 + 操作按钮（在同一行）
         top_row_frame = ttk.Frame(main_frame)
@@ -85,6 +103,11 @@ def show_dicts():
 
     root.update_idletasks()
     canvas.configure(scrollregion=canvas.bbox("all"))
+    canvas.yview_moveto(y_position[0])
+
+    # 更新下拉菜单内容
+    register_names = [d.get("RegisterName", f"Dict{i}") for i, d in enumerate(dict_list)]
+    combobox['values'] = register_names
 
 def delete_dict(index):
     """删除指定的 dict"""
@@ -127,7 +150,8 @@ def add_field(index):
 
     # 获取该 dict 中的 Fields
     existing_fields = dict_list[index].get('Fields', {})
-    new_field_key = max(existing_fields.keys()) + 1 if existing_fields else 1
+    #new_field_key = max(existing_fields.keys()) + 1 if existing_fields else 1
+    new_field_key = len(existing_fields.keys()) + 1
 
     # 新 Field 的初始结构（与 base_dict 内 Field 结构相同）
     new_field = {
@@ -165,7 +189,7 @@ def add_field(index):
         # 确保 'Fields' 键存在
         if 'Fields' not in dict_list[index]:
             dict_list[index]['Fields'] = {}
-        dict_list[index]['Fields'][new_field_key] = updated_field
+        dict_list[index]['Fields'][str(new_field_key)] = updated_field
         edit_window.destroy()
         show_dicts()
 
@@ -227,7 +251,8 @@ def open_edit_window(target_dict, on_submit):
         nonlocal row
         for key, value in d.items():
             if isinstance(value, dict):
-                add_entries(value, keys + [key])
+                #add_entries(value, keys + [key])
+                pass
             else:
                 #label = ttk.Label(form_frame, text=" -> ".join(map(str, keys + [key])) + f"(Old Value:{value}):")
                 label = ttk.Label(form_frame, text=" -> ".join(map(str, keys + [key])))
@@ -253,10 +278,73 @@ def open_edit_window(target_dict, on_submit):
     submit_btn = ttk.Button(form_frame, text="Done", command=submit_form)
     submit_btn.grid(row=row, column=0, columnspan=2, pady=10)
 
+def save_to_file():
+    file_path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON", "*.json")])
+    if file_path:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(dict_list, f, ensure_ascii=False, indent=2)
+
+def load_from_file():
+    file_path = filedialog.askopenfilename(filetypes=[("JSON", "*.json")])
+    if file_path:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                global dict_list
+                dict_list = data
+                show_dicts()
+
+def search_and_jump():
+    global highlighted_index
+    keyword = search_var.get().lower()
+    for i, d in enumerate(dict_list):
+        #if keyword in str(d).lower():
+        if d.get("RegisterName").lower() == keyword:
+            highlighted_index = i
+            show_dicts()
+            canvas.yview_moveto(i / max(1, len(dict_list)))
+            break
+
+def jump_to_dict_by_name(event=None):
+    global highlighted_index
+    name = register_name_var.get()
+    for i, d in enumerate(dict_list):
+        if d.get("RegisterName") == name:
+            highlighted_index = i
+            show_dicts()
+            canvas.yview_moveto(i / max(1, len(dict_list)))
+            break
 
 # 主窗口
 root = tk.Tk()
 root.title("Register Editor")
+root.geometry("1000x600")  # 宽1000，高600
+
+style = ttk.Style()
+#style.configure("TFrame", background="SytemButtonFace")  # 默认样式
+style.configure("TFrame")  # 默认样式
+style.configure("Highlight.TFrame", background="#fffacd")  # 高亮样式（淡黄）
+
+# 搜索和跳转控件
+search_var = tk.StringVar()
+register_name_var = tk.StringVar()
+
+# UI 顶部操作区
+top_bar = ttk.Frame(root)
+top_bar.pack(side="top", fill="x", padx=5, pady=2)
+
+ttk.Button(top_bar, text="Add Register", command=lambda: add_new_dict()).pack(side="left", padx=2)
+ttk.Button(top_bar, text="Save", command=save_to_file).pack(side="left", padx=2)
+ttk.Button(top_bar, text="Load", command=load_from_file).pack(side="left", padx=2)
+search_entry = ttk.Entry(top_bar, textvariable=search_var, width=30)
+search_entry.bind("<Return>", lambda event: search_and_jump())
+search_entry.pack(side="left", padx=5)
+ttk.Button(top_bar, text="Search", command=search_and_jump).pack(side="left")
+
+register_names = [d.get("RegisterName", f"Dict{i}") for i, d in enumerate(dict_list)]
+combobox = ttk.Combobox(top_bar, values=register_names, textvariable=register_name_var)
+combobox.pack(side="right", padx=5)
+combobox.bind("<<ComboboxSelected>>", jump_to_dict_by_name)
 
 # 创建外层 Frame 包裹 canvas + scrollbar
 outer_frame = ttk.Frame(root)
@@ -317,7 +405,7 @@ else:  # Linux 处理方式
     canvas.bind_all("<Shift-Button-4>", lambda e: canvas.xview_scroll(-1, "units"))
     canvas.bind_all("<Shift-Button-5>", lambda e: canvas.xview_scroll(1, "units"))
 
-ttk.Button(root, text="Add Register", command=add_new_dict).pack(pady=5)
+#ttk.Button(root, text="Add Register", command=add_new_dict).pack(pady=5) #move to top_bar
 
 show_dicts()
 

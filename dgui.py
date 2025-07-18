@@ -37,6 +37,7 @@ dict_list = [copy.deepcopy(base_dict)]
 dict_frames = []
 highlighted_index = None
 data_modified = False
+current_file = None
 
 # ===================== 主函数区 =====================
 def show_dicts():
@@ -98,10 +99,10 @@ def show_dicts():
     combobox['values'] = [d.get("RegisterName", f"Dict{i}") for i, d in enumerate(dict_list)]
 
 def delete_dict(index):
-    global data_modified
+    #global data_modified
     if 0 <= index < len(dict_list):
         del dict_list[index]
-    data_modified = True
+    mark_modified() # data_modified = True
     show_dicts()
 
 def add_new_dict():
@@ -121,11 +122,11 @@ def update_existing_dict(index, updated):
 
 def add_field(index):
     def submit():
-        global data_modified
+        #global data_modified
         updated = {k: e.get() for k, e in entry_fields}
         dict_list[index].setdefault('Fields', {})[str(new_key)] = updated
         win.destroy()
-        data_modified = True
+        mark_modified() # data_modified = True
         show_dicts()
 
     win = tk.Toplevel(root)
@@ -151,10 +152,10 @@ def add_field(index):
 
 def edit_field(d_idx, f_key):
     def submit():
-        global data_modified
+        #global data_modified
         dict_list[d_idx]['Fields'][f_key] = {k: e.get() for k, e in entry_fields}
         win.destroy()
-        data_modified = True
+        mark_modified() # data_modified = True
         show_dicts()
 
     win = tk.Toplevel(root)
@@ -174,9 +175,9 @@ def edit_field(d_idx, f_key):
     ttk.Button(form, text="Done", command=submit).grid(row=row, column=0, columnspan=2, pady=10)
 
 def delete_field(d_idx, f_key):
-    global data_modified
+    #global data_modified
     dict_list[d_idx]['Fields'].pop(f_key, None)
-    data_modified = True
+    mark_modified() # data_modified = True
     show_dicts()
 
 def open_edit_window(d, on_submit):
@@ -196,38 +197,64 @@ def open_edit_window(d, on_submit):
         row += 1
 
     def submit():
-        global data_modified
+        #global data_modified
         for k, e in entry_fields:
             d[k] = e.get()
         on_submit(d)
         win.destroy()
-        data_modified = True
+        mark_modified() # data_modified = True
 
     ttk.Button(form, text="Done", command=submit).grid(row=row, column=0, columnspan=2, pady=10)
 
+def update_title():
+    """更新窗口标题"""
+    title = "Register Editor"
+    if current_file:
+        title += f" - {current_file}"
+    if data_modified:
+        title += " *"
+    root.title(title)
+
 def save_to_file():
-    global data_modified
-    file = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON", "*.json")])
+    global data_modified, current_file
+    if current_file is None:
+        file = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON", "*.json")])
+        if not file:
+            return
+        current_file = file
+    else:
+        file = current_file
     if file:
         with open(file, 'w', encoding='utf-8') as f:
             json.dump(dict_list, f, ensure_ascii=False, indent=2)
     data_modified = False
+    update_title()
 
 def load_from_file():
-    global data_modified
+    global dict_list, data_modified, current_file
     if data_modified:
-        result = messagebox.askyesnocancel("Warning!", "Data modified. Save before close.")
+        result = messagebox.askyesnocancel("Warning!", "Data modified. Save before loading.")
         if result is True:
             save_to_file()
+        elif result is None:
+            return # Cancel
 
     file = filedialog.askopenfilename(filetypes=[("JSON", "*.json")])
     if file:
         with open(file, 'r', encoding='utf-8') as f:
             data = json.load(f)
             if isinstance(data, list):
-                global dict_list
                 dict_list = data
+                current_file = file
+                data_modified = False
+                update_title()
                 show_dicts()
+
+def mark_modified():
+    """标记数据已修改"""
+    global data_modified
+    data_modified = True
+    update_title()
 
 def search_and_jump():
     global highlighted_index
@@ -250,7 +277,7 @@ def jump_to_dict_by_name(event=None):
             break
 
 def on_close():
-    global data_modified
+    #global data_modified
     if data_modified:
         result = messagebox.askyesnocancel("Warning!", "Data modified. Save before close.")
         if result is True:
@@ -295,6 +322,47 @@ ttk.Button(top_bar, text="Search", command=search_and_jump).pack(side="left")
 combobox = ttk.Combobox(top_bar, values=[], textvariable=register_name_var)
 combobox.pack(side="right", padx=6)
 combobox.bind("<<ComboboxSelected>>", jump_to_dict_by_name)
+
+# 中间Frame（top_bar 和 outer_frame 之间）
+middle_frame = ttk.Frame(root, padding=8)
+middle_frame.pack(fill="x", padx=8, pady=4)
+
+# 第一行：两个 Combobox
+first_row = ttk.Frame(middle_frame)
+first_row.pack(fill="x", pady=2)
+ttk.Label(first_row, text='General Info: ', justify="left").pack(side="left", padx=4)
+ttk.Label(first_row, text='ModuleName', justify="left").pack(side="left", padx=4)
+modulename_entry_var = tk.StringVar()
+ttk.Entry(first_row, textvariable=modulename_entry_var, width=10).pack(side="left", padx=4)
+ttk.Label(first_row, text='DataWidth', justify="left").pack(side="left", padx=4)
+datawidth_entry_var = tk.StringVar()
+ttk.Entry(first_row, textvariable=datawidth_entry_var, width=5).pack(side="left", padx=4)
+
+## 第二行：两个 Entry
+second_row = ttk.Frame(middle_frame)
+second_row.pack(fill="x", pady=2)
+ttk.Label(second_row, text='Default Values: ', justify="left").pack(side="left", padx=4)
+ttk.Label(second_row, text='EnableBy', justify="left").pack(side="left", padx=4)
+enableby_combo_var = tk.StringVar()
+ttk.Combobox(second_row, textvariable=enableby_combo_var, width=5).pack(side="left", padx=4)
+ttk.Label(second_row, text='Flag', justify="left").pack(side="left", padx=4)
+flag_combo_var = tk.StringVar()
+ttk.Combobox(second_row, textvariable=flag_combo_var, width=5).pack(side="left", padx=4)
+ttk.Label(second_row, text='HardwareUpdate', justify="left").pack(side="left", padx=4)
+hardwareupdate_combo_var = tk.StringVar()
+ttk.Combobox(second_row, textvariable=hardwareupdate_combo_var, width=5).pack(side="left", padx=4)
+ttk.Label(second_row, text='NotGenCode', justify="left").pack(side="left", padx=4)
+notgencode_combo_var = tk.StringVar()
+ttk.Combobox(second_row, textvariable=notgencode_combo_var, width=5).pack(side="left", padx=4)
+ttk.Label(second_row, text='SelfClear', justify="left").pack(side="left", padx=4)
+selfclear_combo_var = tk.StringVar()
+ttk.Combobox(second_row, textvariable=selfclear_combo_var, width=5).pack(side="left", padx=4)
+ttk.Label(second_row, text='SoftwareReset', justify="left").pack(side="left", padx=4)
+softwarereset_combo_var = tk.StringVar()
+ttk.Combobox(second_row, textvariable=softwarereset_combo_var, width=5).pack(side="left", padx=4)
+ttk.Label(second_row, text='Volatile', justify="left").pack(side="left", padx=4)
+volatile_combo_var = tk.StringVar()
+ttk.Combobox(second_row, textvariable=volatile_combo_var, width=5).pack(side="left", padx=4)
 
 # 外层frame+滚动
 outer_frame = ttk.Frame(root)
